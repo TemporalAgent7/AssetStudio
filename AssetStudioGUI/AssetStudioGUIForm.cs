@@ -704,6 +704,15 @@ namespace AssetStudioGUI
                     case MonoBehaviour m_MonoBehaviour:
                         PreviewMonoBehaviour(m_MonoBehaviour);
                         break;
+                    case RectTransform m_RectTransform:
+                        PreviewRectTransform(m_RectTransform);
+                        break;
+                    case Transform m_RectTransform:
+                        PreviewRectTransform(m_RectTransform);
+                        break;
+                    case GameObject m_RectTransform:
+                        PreviewRectTransform(m_RectTransform);
+                        break;
                     case Font m_Font:
                         PreviewFont(m_Font);
                         break;
@@ -938,6 +947,21 @@ namespace AssetStudioGUI
             PreviewText(text);
         }
 
+        private void PreviewRectTransform(AssetStudio.Object m_RectTransform)
+        {
+            var obj = m_RectTransform.ToType();
+            obj.Add("_PathID", m_RectTransform.m_PathID.ToString());
+
+            var settings = new JsonSerializerSettings
+            {
+                Converters = { new FormatNumbersAsTextConverter() },
+                Formatting = Formatting.Indented
+            };
+
+            var str = JsonConvert.SerializeObject(obj, settings);
+            PreviewText(str);
+        }
+
         private void PreviewMonoBehaviour(MonoBehaviour m_MonoBehaviour)
         {
             var obj = m_MonoBehaviour.ToType();
@@ -946,7 +970,15 @@ namespace AssetStudioGUI
                 var type = MonoBehaviourToTypeTree(m_MonoBehaviour);
                 obj = m_MonoBehaviour.ToType(type);
             }
-            var str = JsonConvert.SerializeObject(obj, Formatting.Indented);
+            obj.Add("_PathID", m_MonoBehaviour.m_PathID.ToString());
+
+            var settings = new JsonSerializerSettings
+            {
+                Converters = { new FormatNumbersAsTextConverter() },
+                Formatting = Formatting.Indented
+            };
+
+            var str = JsonConvert.SerializeObject(obj, settings);
             PreviewText(str);
         }
 

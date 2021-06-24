@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
@@ -9,6 +10,26 @@ using TGASharpLib;
 
 namespace AssetStudioGUI
 {
+    internal sealed class FormatNumbersAsTextConverter : JsonConverter
+    {
+        public override bool CanRead => false;
+        public override bool CanWrite => true;
+        public override bool CanConvert(Type type) => type == typeof(long);
+
+        public override void WriteJson(
+            JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            long number = (long)value;
+            writer.WriteValue(number.ToString());
+        }
+
+        public override object ReadJson(
+            JsonReader reader, Type type, object existingValue, JsonSerializer serializer)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
     internal static class Exporter
     {
         public static bool ExportTexture2D(AssetItem item, string exportPath)
@@ -112,6 +133,32 @@ namespace AssetStudioGUI
             return true;
         }
 
+        public static bool ExportRectTransform(AssetItem item, string exportPath)
+        {
+            if (!TryExportFile(exportPath, item, ".json", out var exportFullPath))
+                return false;
+
+            var m_RectTransform = (AssetStudio.Object)item.Asset;
+            var type = m_RectTransform.ToType();
+
+            if (type == null)
+            {
+                return ExportRawFile(item, exportPath);
+            }
+
+            type.Add("_PathID", m_RectTransform.m_PathID.ToString());
+
+            var settings = new JsonSerializerSettings
+            {
+                Converters = { new FormatNumbersAsTextConverter() },
+                Formatting = Formatting.Indented
+            };
+
+            var str = JsonConvert.SerializeObject(type, settings);
+            File.WriteAllText(exportFullPath, str);
+            return true;
+        }
+
         public static bool ExportMonoBehaviour(AssetItem item, string exportPath)
         {
             if (!TryExportFile(exportPath, item, ".json", out var exportFullPath))
@@ -123,7 +170,16 @@ namespace AssetStudioGUI
                 var m_Type = Studio.MonoBehaviourToTypeTree(m_MonoBehaviour);
                 type = m_MonoBehaviour.ToType(m_Type);
             }
-            var str = JsonConvert.SerializeObject(type, Formatting.Indented);
+
+            type.Add("_PathID", m_MonoBehaviour.m_PathID.ToString());
+
+            var settings = new JsonSerializerSettings
+            {
+                Converters = { new FormatNumbersAsTextConverter() },
+                Formatting = Formatting.Indented
+            };
+
+            var str = JsonConvert.SerializeObject(type, settings);
             File.WriteAllText(exportFullPath, str);
             return true;
         }
@@ -399,6 +455,10 @@ namespace AssetStudioGUI
                     return ExportTextAsset(item, exportPath);
                 case ClassIDType.MonoBehaviour:
                     return ExportMonoBehaviour(item, exportPath);
+                case ClassIDType.RectTransform:
+                case ClassIDType.Transform:
+                case ClassIDType.GameObject:
+                    return ExportRectTransform(item, exportPath);
                 case ClassIDType.Font:
                     return ExportFont(item, exportPath);
                 case ClassIDType.Mesh:
