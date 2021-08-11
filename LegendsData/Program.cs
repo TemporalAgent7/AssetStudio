@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Drawing;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -13,14 +14,27 @@ using Newtonsoft.Json.Linq;
 using AssetStudio;
 using System.Net;
 using System.Collections;
+using System.Drawing.Imaging;
 
 namespace LegendsData
 {
     class Program
     {
-        const int LAST_KNOWN_DEFAULT = 7575;
+        const int LAST_KNOWN_DEFAULT = 7591;
 
         public static AssetsManager assetsManager = new AssetsManager();
+
+        static void DownloadAsset(string assetsBaseUrl, string assetName)
+        {
+            Console.Write(string.Format("Downloading {0}/{1}...", assetsBaseUrl, assetName));
+
+            using (var client = new WebClient())
+            {
+                client.DownloadFile(string.Format("{0}/{1}", assetsBaseUrl, assetName), string.Format("{0}{1}", Path.GetTempPath(), assetName));
+            }
+
+            Console.WriteLine("done!");
+        }
 
         static void Main(string[] args)
         {
@@ -39,23 +53,9 @@ namespace LegendsData
             {
                 var assetsBaseUrl = Utils.GetLastAssetUrl(last_known);
 
-                Console.Write(string.Format("Downloading {0}/bindata...", assetsBaseUrl));
-
-                using (var client = new WebClient())
-                {
-                    client.DownloadFile(string.Format("{0}/bindata", assetsBaseUrl), string.Format("{0}bindata", Path.GetTempPath()));
-                }
-
-                Console.WriteLine("done!");
-
-                Console.Write(string.Format("Downloading {0}/localization...", assetsBaseUrl));
-
-                using (var client = new WebClient())
-                {
-                    client.DownloadFile(string.Format("{0}/localization", assetsBaseUrl), string.Format("{0}localization", Path.GetTempPath()));
-                }
-
-                Console.WriteLine("done!");
+                DownloadAsset(assetsBaseUrl, "bindata");
+                DownloadAsset(assetsBaseUrl, "localization");
+                DownloadAsset(assetsBaseUrl, "sprite_hero_bundle2");
             }
 
             string outPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
@@ -63,10 +63,12 @@ namespace LegendsData
             // ensure paths
             Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "extracted"));
             Directory.CreateDirectory(Path.Combine(outPath, "extracted"));
+            Directory.CreateDirectory(Path.Combine(outPath, "extracted_assets"));
 
             // extract with AssetBundle
-            assetsManager.LoadFiles(new[] { string.Format("{0}bindata", Path.GetTempPath()), string.Format("{0}localization", Path.GetTempPath()) });
+            assetsManager.LoadFiles(new[] { string.Format("{0}bindata", Path.GetTempPath()), string.Format("{0}localization", Path.GetTempPath()), string.Format("{0}sprite_hero_bundle2", Path.GetTempPath()) });
 
+            // Localization
             foreach (AssetStudio.Object asset in assetsManager.assetsFileList[1].Objects)
             {
                 if (asset is AssetStudio.MonoBehaviour)
@@ -79,6 +81,18 @@ namespace LegendsData
                 }
             }
 
+            // Image assets
+            foreach (AssetStudio.Object asset in assetsManager.assetsFileList[2].Objects)
+            {
+                if (asset is AssetStudio.Texture2D)
+                {
+                    var textureAsset = asset as AssetStudio.Texture2D;
+                    var bitmap = textureAsset.ConvertToBitmap(true);
+                    bitmap.Save(Path.Combine(outPath, "extracted_assets", textureAsset.m_Name + ".png"), ImageFormat.Png);
+                }
+            }
+
+            // bindata
             foreach (AssetStudio.Object asset in assetsManager.assetsFileList[0].Objects)
             {
                 if (asset is AssetStudio.TextAsset)
